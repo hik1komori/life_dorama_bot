@@ -846,7 +846,16 @@ def get_admin_dorama_list_keyboard(doramas, page, total_pages, delete_mode=False
     """Клавиатура списка дорам для админов"""
     keyboard = []
     
-    for dorama_code, title, year, genre, rating, episode_count in doramas:
+    for dorama in doramas:
+        # Безопасная распаковка
+        if len(dorama) == 6:
+            dorama_code, title, year, genre, rating, episode_count = dorama
+        elif len(dorama) == 5:
+            dorama_code, title, year, genre, episode_count = dorama
+            rating = 0
+        else:
+            continue
+            
         display_text = f"📺 {title} ({episode_count}q)"
         if delete_mode:
             keyboard.append([
@@ -1002,11 +1011,14 @@ async def search_doramas(update: Update, context: ContextTypes.DEFAULT_TYPE, que
         await send_all_episodes(update, context, dorama_code)
     else:
         text = f"🔍 '{query}' bo'yicha topilgan doramalar ({len(doramas)} ta):\n\n"
-for i, dorama in enumerate(doramas, 1):
-    if len(dorama) >= 5:
-        code, title, year, genre, episode_count = dorama[:5]
-    else:
-        continue  # Пропускаем некорректные записи            text += f"{i}. {title}"
+        for i, dorama in enumerate(doramas, 1):
+            # Безопасная распаковка
+            if len(dorama) >= 5:
+                code, title, year, genre, episode_count = dorama[:5]
+            else:
+                continue  # Пропускаем некорректные записи
+            
+            text += f"{i}. {title}"
             if year:
                 text += f" ({year})"
             if episode_count:
@@ -1201,7 +1213,16 @@ async def show_all_doramas(update: Update, context: ContextTypes.DEFAULT_TYPE, p
         return
     
     text = "📚 Barcha doramalar:\n\n"
-    for i, (code, title, year, genre, rating, episode_count) in enumerate(doramas, 1):
+    for i, dorama in enumerate(doramas, 1):
+        # Безопасная распаковка
+        if len(dorama) == 6:
+            code, title, year, genre, rating, episode_count = dorama
+        elif len(dorama) == 5:
+            code, title, year, genre, episode_count = dorama
+            rating = 0
+        else:
+            continue
+            
         text += f"{i}. {title}"
         if year:
             text += f" ({year})"
@@ -1223,7 +1244,16 @@ async def show_recent_doramas(update: Update, context: ContextTypes.DEFAULT_TYPE
     recent_doramas = doramas[:10]
     
     text = "🆕 So'ngi qo'shilgan doramalar:\n\n"
-    for i, (code, title, year, genre, rating, episode_count) in enumerate(recent_doramas, 1):
+    for i, dorama in enumerate(recent_doramas, 1):
+        # Безопасная распаковка
+        if len(dorama) == 6:
+            code, title, year, genre, rating, episode_count = dorama
+        elif len(dorama) == 5:
+            code, title, year, genre, episode_count = dorama
+            rating = 0
+        else:
+            continue
+            
         text += f"{i}. {title}"
         if year:
             text += f" ({year})"
@@ -1332,7 +1362,16 @@ async def show_admin_doramas(query, page=0, delete_mode=False):
         text = f"🎬 **Barcha doramalar** (Sahifa {page+1}/{total_pages})\n\n"
         text += f"Jami doramalar: {total_count} ta\n\n"
     
-    for i, (code, title, year, genre, rating, episode_count) in enumerate(page_doramas, offset + 1):
+    for i, dorama in enumerate(page_doramas, offset + 1):
+        # Безопасная распаковка
+        if len(dorama) == 6:
+            code, title, year, genre, rating, episode_count = dorama
+        elif len(dorama) == 5:
+            code, title, year, genre, episode_count = dorama
+            rating = 0
+        else:
+            continue
+            
         text += f"{i}. 🎬 {title}\n   🔗 Kod: {code}\n   📺 Qismlar: {episode_count} ta\n\n"
     
     await query.edit_message_text(text, reply_markup=get_admin_dorama_list_keyboard(page_doramas, page, total_pages, delete_mode))
@@ -1694,7 +1733,14 @@ async def handle_admin_video(update: Update, context: ContextTypes.DEFAULT_TYPE)
             title_match = re.search(r'#nomi[_:]?([^#\n]+)', caption, re.IGNORECASE)
             title = title_match.group(1).strip() if title_match else f"Dorama {dorama_code}"
             
-            db.add_dorama(dorama_code, title)
+            # Извлекаем дополнительные данные из caption
+            year_match = re.search(r'#(\d{4})', caption)
+            year = int(year_match.group(1)) if year_match else None
+            
+            genre_match = re.search(r'#(\w+)', caption)
+            genre = genre_match.group(1) if genre_match else ""
+            
+            db.add_dorama(dorama_code, title, "", year, genre)
             logger.info(f"✅ Yangi dorama yaratildi: {title} ({dorama_code})")
         
         # Добавляем эпизод
