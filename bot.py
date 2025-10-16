@@ -821,7 +821,16 @@ def get_dorama_list_keyboard(doramas, prefix="dorama"):
     """Клавиатура списка дорам"""
     keyboard = []
     
-    for dorama_code, title, year, genre, rating, episode_count in doramas:
+    for dorama in doramas:
+        # Безопасная распаковка с проверкой количества элементов
+        if len(dorama) == 6:
+            dorama_code, title, year, genre, rating, episode_count = dorama
+        elif len(dorama) == 5:
+            dorama_code, title, year, genre, episode_count = dorama
+            rating = 0  # Добавляем рейтинг по умолчанию
+        else:
+            continue  # Пропускаем некорректные записи
+        
         display_text = f"📺 {title}"
         if year:
             display_text += f" ({year})"
@@ -993,8 +1002,11 @@ async def search_doramas(update: Update, context: ContextTypes.DEFAULT_TYPE, que
         await send_all_episodes(update, context, dorama_code)
     else:
         text = f"🔍 '{query}' bo'yicha topilgan doramalar ({len(doramas)} ta):\n\n"
-        for i, (code, title, year, genre, episode_count) in enumerate(doramas, 1):
-            text += f"{i}. {title}"
+for i, dorama in enumerate(doramas, 1):
+    if len(dorama) >= 5:
+        code, title, year, genre, episode_count = dorama[:5]
+    else:
+        continue  # Пропускаем некорректные записи            text += f"{i}. {title}"
             if year:
                 text += f" ({year})"
             if episode_count:
