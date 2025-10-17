@@ -589,18 +589,21 @@ async def show_subscription_required(update: Update, context: ContextTypes.DEFAU
         channel_name = title or username or f"Kanal {channel_id}"
         
         if is_private and invite_link:
+            # Для приватных каналов используем invite_link
             url = invite_link
             button_text = f"🔒 {channel_name} (Maxfiy kanal - ariza qoldiring)"
         elif invite_link:
+            # Если есть прямая ссылка приглашения
             url = invite_link
             button_text = f"📢 {channel_name}"
+        elif username:
+            # Если есть username, создаем корректную ссылку
+            clean_username = username.lstrip('@')
+            url = f"https://t.me/{clean_username}"
+            button_text = f"📢 {channel_name}"
         else:
-            clean_username = (username or '').lstrip('@')
-            if clean_username:
-                url = f"https://t.me/{clean_username}"
-                button_text = f"📢 {channel_name}"
-            else:
-                continue
+            # Если нет ни invite_link, ни username, пропускаем канал
+            continue
         
         keyboard.append([InlineKeyboardButton(button_text, url=url)])
     
@@ -1764,25 +1767,54 @@ async def add_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     if user.id not in ADMIN_IDS:
         return
     
-    if context.args and len(context.args) >= 2:
+    if len(context.args) >= 2:
         try:
             channel_id = int(context.args[0])
-            username = context.args[1]
-            title = context.args[2] if len(context.args) > 2 else None
-            invite_link = context.args[3] if len(context.args) > 3 else None
-            is_private = context.args[4].lower() == 'true' if len(context.args) > 4 else False
+            username = context.args[1].lstrip('@')  # Убираем @ если есть
+            
+            # Обрабатываем остальные аргументы
+            title = None
+            invite_link = None
+            is_private = False
+            
+            for i in range(2, len(context.args)):
+                arg = context.args[i]
+                if arg.startswith('http'):
+                    invite_link = arg
+                elif arg.lower() in ['true', 'false', 'private']:
+                    is_private = arg.lower() in ['true', 'private']
+                else:
+                    # Если это не ссылка и не булево значение, считаем это названием
+                    title = arg
+            
+            # Если название не указано, используем username
+            if not title:
+                title = f"@{username}" if username else f"Kanal {channel_id}"
             
             success = db.add_channel(channel_id, username, title, invite_link, is_private)
             
             if success:
-                await update.message.reply_text(f"✅ Kanal {username} qo'shildi!")
+                await update.message.reply_text(
+                    f"✅ Kanal qo'shildi!\n\n"
+                    f"📢 Nomi: {title}\n"
+                    f"🔗 Username: @{username}\n"
+                    f"🆔 ID: {channel_id}\n"
+                    f"🔗 Link: {invite_link or 'Yoʻq'}\n"
+                    f"🔒 Maxfiy: {'Ha' if is_private else 'Yoʻq'}"
+                )
             else:
                 await update.message.reply_text("❌ Kanal qo'shishda xato")
         except ValueError:
             await update.message.reply_text("❌ Kanal ID raqam bo'lishi kerak")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Xato: {e}")
     else:
         await update.message.reply_text(
-            "❌ Foydalanish: /addchannel <id> <@username> [nomi] [invite_link] [private]"
+            "❌ Foydalanish: /addchannel <id> <@username> [nomi] [invite_link] [private]\n\n"
+            "Misol:\n"
+            "• /addchannel -100123456789 @kanal_nomi \"Kanal Nomi\" https://t.me/kanal_nomi false\n"
+            "• /addchannel -100123456789 @maxfiy_kanal \"Maxfiy Kanal\" https://t.me/maxfiy_kanal private\n"
+            "• /addchannel -100123456789 @oddiy_kanal"
         )
 
 async def add_private_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1791,23 +1823,36 @@ async def add_private_channel_command(update: Update, context: ContextTypes.DEFA
     if user.id not in ADMIN_IDS:
         return
     
-    if context.args and len(context.args) >= 2:
+    if len(context.args) >= 2:
         try:
             channel_id = int(context.args[0])
             invite_link = context.args[1]
+            
+            # Название канала (опционально)
             title = context.args[2] if len(context.args) > 2 else f"Maxfiy kanal {channel_id}"
             
             success = db.add_channel(channel_id, "", title, invite_link, True)
             
             if success:
-                await update.message.reply_text(f"✅ Maxfiy kanal {title} qo'shildi!")
+                await update.message.reply_text(
+                    f"✅ Maxfiy kanal qo'shildi!\n\n"
+                    f"📢 Nomi: {title}\n"
+                    f"🆔 ID: {channel_id}\n"
+                    f"🔗 Taklif linki: {invite_link}\n"
+                    f"🔒 Turi: Maxfiy kanal"
+                )
             else:
                 await update.message.reply_text("❌ Kanal qo'shishda xato")
         except ValueError:
             await update.message.reply_text("❌ Kanal ID raqam bo'lishi kerak")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Xato: {e}")
     else:
         await update.message.reply_text(
-            "❌ Foydalanish: /addprivatechannel <id> <invite_link> [nomi]"
+            "❌ Foydalanish: /addprivatechannel <id> <invite_link> [nomi]\n\n"
+            "Misol:\n"
+            "• /addprivatechannel -100123456789 https://t.me/+AbCdEfGhIjKlMnOp \"Maxfiy Kanal\"\n"
+            "• /addprivatechannel -100123456789 https://t.me/+AbCdEfGhIjKlMnOp"
         )
 
 async def delete_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
